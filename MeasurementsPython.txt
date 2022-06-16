@@ -1,0 +1,72 @@
+import RPi.GPIO as GPIO
+import board
+import busio
+import digitalio
+import adafruit_am2320
+import adafruit_mcp3xxx.mcp3008 as mcp
+from adafruit_mcp3xxx.analog_in import AnalogIn
+import time
+import requests
+from time import sleep
+from datetime import datetime
+i2c = busio.I2C(board.SCL, board.SDA)
+
+GPIO.setmode(GPIO.BCM)
+
+plantName = "Fido"
+
+LED_WORKING = 5
+LED_WARNING_SOIL = 13
+LED_WARNING_TEMP = 19
+YL_69  = 26
+tSoil = ""
+tTemp = 16
+
+
+GPIO.setup(LED_WORKING, GPIO.OUT)
+GPIO.setup(LED_WARNING_SOIL, GPIO.OUT)
+GPIO.setup(LED_WARNING_TEMP, GPIO.OUT)
+GPIO.setup(YL_69, GPIO.IN)
+
+sensor = adafruit_am2320.AM2320(i2c)
+
+url = 'http://192.168.137.1:7211/api/measurements'
+
+while True:
+    humidity = sensor.relative_humidity
+    temp = sensor.temperature
+    tTemp = sensor.temperature
+    print("Humidity: {0}%".format(sensor.relative_humidity))
+    print("Temparture: {0}C".format(sensor.temperature))
+    tSoil = GPIO.input(YL_69)
+    if GPIO.input(YL_69):
+        soil = "dry soil"
+    else:
+        soil = "wet soil"
+    myobj = {'temperature': temp, 'humidity' : humidity, 'moisture' : soil, 'plantName' : plantName }
+
+    r = requests.post(url, json = myobj)
+    print(r)
+    print(soil)
+#YELLOW LIGHT
+    if(tTemp < 15.0 and tSoil == 0):
+        GPIO.output(LED_WORKING,False)
+        GPIO.output(LED_WARNING_SOIL,False)
+        GPIO.output(LED_WARNING_TEMP,True)
+#RED LIGHT
+    elif(tTemp > 15.0 and  tSoil == 1):
+        GPIO.output(LED_WORKING,False)
+        GPIO.output(LED_WARNING_SOIL,True)
+        GPIO.output(LED_WARNING_TEMP,False)
+#GREEN LIGHT
+    elif(tTemp > 15.0 and tSoil == 0):
+        GPIO.output(LED_WORKING,True)
+        GPIO.output(LED_WARNING_SOIL,False)
+        GPIO.output(LED_WARNING_TEMP,False)
+#RED LIGHT & YELLOW LIGHT
+    elif(tTemp < 15.0 and tSoil == 1):
+        GPIO.output(LED_WORKING,False)
+        GPIO.output(LED_WARNING_SOIL,True)
+        GPIO.output(LED_WARNING_TEMP,True)
+
+    time.sleep(5)
